@@ -322,8 +322,6 @@ JiraService   jiraService;   // built lazily
 JTextField     tfUrl        = new JTextField("https://estjira.example.com", 30);
 JTextField     tfUsername   = new JTextField(16);
 JPasswordField tfToken      = new JPasswordField(16);
-JTextField     tfProjectKey = new JTextField("FCMUS", 8);
-JComboBox<String> cbIssueType = new JComboBox<>({"Test","Task","Sub-task","Story","Bug"});
 JTextField     tfFeatureLink = new JTextField(14);  // User Story to link Test Execution to
 JTextField     tfLabel       = new JTextField(14);  // Label for the Test Execution
 
@@ -351,8 +349,7 @@ FieldConfig    loadedConfig;
 1. **`buildJiraSettingsPanel()`** — `TitledBorder("Jira Settings")`, `GridBagLayout`:
    - Row 0: `label("Jira URL:")`, `tfUrl` (gridwidth=2), button `"Test Connection"` → `onTestConnection()`
    - Row 1: `label("Username:")`, `tfUsername`, `label("API Token:")`, `tfToken`
-   - Row 2: `label("Project Key:")`, `tfProjectKey`, `label("Issue Type:")`, `cbIssueType`
-   - Row 3: `label("Feature Link:")`, `tfFeatureLink`, `label("Label:")`, `tfLabel`
+   - Row 2: `label("Feature Link:")`, `tfFeatureLink`, `label("Label:")`, `tfLabel`
 
 2. **`buildFileSelectionPanel()`** — `TitledBorder("File Selection")`, `GridBagLayout`:
    - Row 0: `label("CSV Folder:")`, `tfCsvFolder` (gridwidth=2), button `"Browse…"` → `onBrowseCsvFolder()`
@@ -400,6 +397,8 @@ After `pack()`: call `setMinimumSize(getSize())`, then `setLocationRelativeTo(nu
 
 **`onImport()`:**
 - Validate: `loadedTestCases` not null/empty, `loadedConfig` not null, `validateJiraFields()` passes
+- Read `projectKey` from `loadedConfig.resolvedProjectKey()` — **no text field for this**
+- If `projectKey` is blank: show error `"Project key not found in config file. Check that 'projectKey.project' is set."` and return
 - Show `YES_NO` confirm dialog:
   ```
   "This will:
@@ -415,7 +414,7 @@ After `pack()`: call `setMinimumSize(getSize())`, then `setLocationRelativeTo(nu
   2. Call `jiraService.createTestExecution(projectKey, featureLink, label)`
   3. Publish `"✔ Test Execution created: KEY"` or `"⚠ Test Execution could not be created — import will continue without linking."`
   4. Publish `"Importing N test case(s)…"`
-  5. Call `jiraService.importAll(loadedTestCases, projectKey, issueType, execKey, loadedConfig)`
+  5. Call `jiraService.importAll(loadedTestCases, projectKey, "Test", execKey, loadedConfig)` — issue type is hardcoded to `"Test"`
   6. Publish each result as `"  ID  →  result"`
   7. Count successes (`startsWith("✔")`), publish `"────────────────────────────────────────"`
   8. Publish `"Done: N/total imported successfully."`
@@ -428,7 +427,7 @@ void buildJiraService()
 // new JiraServiceImpl(tfUrl.getText().trim(), tfUsername.getText().trim(), new String(tfToken.getPassword()))
 
 boolean validateJiraFields()
-// Check tfUrl, tfUsername, tfToken, tfProjectKey are not blank; show error dialog and return false if any missing
+// Check tfUrl, tfUsername, tfToken are not blank; show error dialog and return false if any missing
 
 void refreshTable(List<TestCase> list)
 // tableModel.setRowCount(0); add one row per tc: {identifier, summary, priority, assignee, reporter, environment, testType, labels}
@@ -559,3 +558,5 @@ The resulting `jira-testcase-importer.zip` should contain the full project tree 
 | 13 | `SwingWorker.process()` must be used in `onImport()` for real-time log streaming |
 | 14 | The config file browse must use `FileNameExtensionFilter` to show only `.json` files |
 | 15 | Indent all Java code with **4 spaces** consistently throughout |
+| 16 | **No `cbIssueType` combo box** — issue type is always `"Test"` (hardcoded). Do not add any UI element for selecting the issue type |
+| 17 | **No `tfProjectKey` text field** — project key is read directly from `loadedConfig.resolvedProjectKey()` at import time. The config JSON already contains it under `projectKey.project` |
