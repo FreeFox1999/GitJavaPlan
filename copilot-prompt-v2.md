@@ -231,11 +231,13 @@ jira-testcase-importer/
   private static final String LINK_PREFIX          = "link-";
   private static final String TEST_EXECUTION_TYPE  = "Test Execution";
   private final String      baseUrl;   // trailing slash stripped in constructor
-  private final String      auth;      // "Basic " + Base64(username:token)
+  private final String      auth;      // "Bearer <PAT>"
   private final ObjectMapper json      = new ObjectMapper();
   private final HttpClient   http      = HttpClient.newHttpClient();
   ```
-- Constructor: `JiraServiceImpl(String baseUrl, String username, String token)`
+- Constructor: `JiraServiceImpl(String baseUrl, String pat)`
+  - `this.auth = "Bearer " + pat;`
+  - No username — PAT is self-identifying
 
 #### `testConnection()`:
 - GET `/rest/api/2/myself`
@@ -280,17 +282,15 @@ jira-testcase-importer/
 - Fallback: if `fields` has no `summary` or it's blank, use `tc.summary` or `tc.testCaseIdentifier`
 - Return `json.writeValueAsString(root)` where root wraps `fields`
 
-#### `linkIssues(inwardKey, outwardKey, linkTypeName)` (private):
-- Build ObjectNode:
-  - `type.name` = linkTypeName
-  - `inwardIssue.key` = inwardKey
-  - `outwardIssue.key` = outwardKey
-- POST to `/rest/api/2/issueLink`
-- Log warning if status is not 201 or 204
+#### `addTestToExecution(execKey, testKey)` (private) — **Xray REST API**:
+- POST to `/rest/raven/1.0/api/testexecution/{execKey}/test`
+- Body: `{ "add": ["testKey"] }`
+- Log warning if status is not 200 or 201
 
-#### `handleOutwardLinks(tc, createdKey)` (private):
+#### `handleOutwardLinks(tc, createdKey, config)` (private):
 - Loop `tc.jiraFields.entrySet()` where key starts with `LINK_PREFIX`
-- For each non-blank value: call `linkIssues(createdKey, value, "Test")`
+- For each non-blank value: POST to `/rest/api/2/issueLink` with `type.name = "Test"`, `inwardIssue.key = createdKey`, `outwardIssue.key = linkedKey`
+- Log warning if status is not 201 or 204
 
 #### HTTP helper methods (private):
 ```java
@@ -319,11 +319,10 @@ ConfigService configService = new ConfigServiceImpl();
 JiraService   jiraService;   // built lazily
 
 // Jira Settings
-JTextField     tfUrl        = new JTextField("https://estjira.example.com", 30);
-JTextField     tfUsername   = new JTextField(16);
-JPasswordField tfToken      = new JPasswordField(16);
-JTextField     tfFeatureLink = new JTextField(14);  // User Story to link Test Execution to
-JTextField     tfLabel       = new JTextField(14);  // Label for the Test Execution
+JTextField     tfUrl         = new JTextField("https://estjira.example.com", 30);
+JPasswordField tfToken       = new JPasswordField(24);  // Personal Access Token — no username needed
+JTextField     tfFeatureLink = new JTextField(14);       // User Story to link Test Execution to
+JTextField     tfLabel       = new JTextField(14);       // Label for the Test Execution
 
 // File Selection
 JTextField      tfCsvFolder  = new JTextField(26);  // non-editable
@@ -348,7 +347,7 @@ FieldConfig    loadedConfig;
 
 1. **`buildJiraSettingsPanel()`** — `TitledBorder("Jira Settings")`, `GridBagLayout`:
    - Row 0: `label("Jira URL:")`, `tfUrl` (gridwidth=2), button `"Test Connection"` → `onTestConnection()`
-   - Row 1: `label("Username:")`, `tfUsername`, `label("API Token:")`, `tfToken`
+   - Row 1: `label("Personal Access Token:")`, `tfToken` (gridwidth=2, full row)
    - Row 2: `label("Feature Link:")`, `tfFeatureLink`, `label("Label:")`, `tfLabel`
 
 2. **`buildFileSelectionPanel()`** — `TitledBorder("File Selection")`, `GridBagLayout`:
@@ -424,10 +423,12 @@ After `pack()`: call `setMinimumSize(getSize())`, then `setLocationRelativeTo(nu
 
 ```java
 void buildJiraService()
-// new JiraServiceImpl(tfUrl.getText().trim(), tfUsername.getText().trim(), new String(tfToken.getPassword()))
+// new JiraServiceImpl(tfUrl.getText().trim(), new String(tfToken.getPassword()))
+// PAT only — no username
 
 boolean validateJiraFields()
-// Check tfUrl, tfUsername, tfToken are not blank; show error dialog and return false if any missing
+// Check tfUrl and tfToken are not blank; show error dialog and return false if missing
+// "Personal Access Token is required." — no username check needed
 
 void refreshTable(List<TestCase> list)
 // tableModel.setRowCount(0); add one row per tc: {identifier, summary, priority, assignee, reporter, environment, testType, labels}
@@ -560,3 +561,5 @@ The resulting `jira-testcase-importer.zip` should contain the full project tree 
 | 15 | Indent all Java code with **4 spaces** consistently throughout |
 | 16 | **No `cbIssueType` combo box** — issue type is always `"Test"` (hardcoded). Do not add any UI element for selecting the issue type |
 | 17 | **No `tfProjectKey` text field** — project key is read directly from `loadedConfig.resolvedProjectKey()` at import time. The config JSON already contains it under `projectKey.project` |
+| 18 | **No username field** — PAT authentication is self-identifying. Auth header must be `Authorization: Bearer <token>`, never `Basic base64(user:token)` |
+| 19 | **Use Xray REST API to add tests to execution** — `POST /rest/raven/1.0/api/testexecution/{execKey}/test` with body `{"add":["TEST-KEY"]}`. Do NOT use the generic Jira issueLink API for this |
