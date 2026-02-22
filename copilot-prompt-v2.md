@@ -318,11 +318,12 @@ CsvService    csvService    = new CsvServiceImpl();
 ConfigService configService = new ConfigServiceImpl();
 JiraService   jiraService;   // built lazily
 
-// Jira Settings
-JTextField     tfUrl         = new JTextField("https://estjira.example.com", 30);
-JPasswordField tfToken       = new JPasswordField(24);  // Personal Access Token — no username needed
-JTextField     tfFeatureLink = new JTextField(14);       // User Story to link Test Execution to
-JTextField     tfLabel       = new JTextField(14);       // Label for the Test Execution
+// Jira Settings  (* = mandatory field — prefix label text with "* ")
+JTextField     tfUrl          = new JTextField("https://estjira.example.com", 30);  // * mandatory
+JPasswordField tfToken        = new JPasswordField(24);  // * mandatory — Personal Access Token
+JTextField     tfUserStory    = new JTextField(14);      // * mandatory — User Story issue key to link execution to
+JTextField     tfExecutionName = new JTextField(28);     // * mandatory — becomes the Test Execution summary/title
+JTextField     tfLabel         = new JTextField(14);     // optional  — tag label applied to the Test Execution
 
 // File Selection
 JTextField      tfCsvFolder  = new JTextField(26);  // non-editable
@@ -346,14 +347,15 @@ FieldConfig    loadedConfig;
 **`NORTH`** — `GridLayout(2, 1, 6, 6)` containing:
 
 1. **`buildJiraSettingsPanel()`** — `TitledBorder("Jira Settings")`, `GridBagLayout`:
-   - Row 0: `label("Jira URL:")`, `tfUrl` (gridwidth=2), button `"Test Connection"` → `onTestConnection()`
-   - Row 1: `label("Personal Access Token:")`, `tfToken` (gridwidth=2, full row)
-   - Row 2: `label("Feature Link:")`, `tfFeatureLink`, `label("Label:")`, `tfLabel`
+   - Row 0: `label("* Jira URL:")`, `tfUrl` (gridwidth=2), button `"Test Connection"` → `onTestConnection()`
+   - Row 1: `label("* Personal Access Token:")`, `tfToken` (gridwidth=2, full row)
+   - Row 2: `label("* Linked User Story:")`, `tfUserStory`, `label("Label:")`, `tfLabel`
+   - Row 3: `label("* Execution Name:")`, `tfExecutionName` (gridwidth=2, full row)
 
 2. **`buildFileSelectionPanel()`** — `TitledBorder("File Selection")`, `GridBagLayout`:
-   - Row 0: `label("CSV Folder:")`, `tfCsvFolder` (gridwidth=2), button `"Browse…"` → `onBrowseCsvFolder()`
-   - Row 1: `label("CSV File:")`, `cbCsvFiles` (gridwidth=2), button `"Preview"` → `onPreview()`
-   - Row 2: `label("Config File:")`, `tfConfigFile` (gridwidth=2), button `"Browse…"` → `onBrowseConfigFile()`
+   - Row 0: `label("* CSV Folder:")`, `tfCsvFolder` (gridwidth=2), button `"Browse…"` → `onBrowseCsvFolder()`
+   - Row 1: `label("* CSV File:")`, `cbCsvFiles` (gridwidth=2), button `"Preview"` → `onPreview()`
+   - Row 2: `label("* Config File:")`, `tfConfigFile` (gridwidth=2), button `"Browse…"` → `onBrowseConfigFile()`
    - `cbCsvFiles` renderer: show only `file.getName()`
 
 **`CENTER`** — `TitledBorder("Test Cases Preview")`, `BorderLayout`, contains `JScrollPane(new JTable(tableModel))`:
@@ -423,12 +425,11 @@ After `pack()`: call `setMinimumSize(getSize())`, then `setLocationRelativeTo(nu
 
 ```java
 void buildJiraService()
-// new JiraServiceImpl(tfUrl.getText().trim(), new String(tfToken.getPassword()))
-// PAT only — no username
+// new JiraServiceImpl(tfUrl.getText().trim(), new String(tfToken.getPassword()))  — PAT only, no username
 
 boolean validateJiraFields()
-// Check tfUrl and tfToken are not blank; show error dialog and return false if missing
-// "Personal Access Token is required." — no username check needed
+// Check tfUrl ("* Jira URL is required.") and tfToken ("* Personal Access Token is required.") are not blank
+// executionName is validated separately inside onImport() before the confirm dialog
 
 void refreshTable(List<TestCase> list)
 // tableModel.setRowCount(0); add one row per tc: {identifier, summary, priority, assignee, reporter, environment, testType, labels}
@@ -562,4 +563,6 @@ The resulting `jira-testcase-importer.zip` should contain the full project tree 
 | 16 | **No `cbIssueType` combo box** — issue type is always `"Test"` (hardcoded). Do not add any UI element for selecting the issue type |
 | 17 | **No `tfProjectKey` text field** — project key is read directly from `loadedConfig.resolvedProjectKey()` at import time. The config JSON already contains it under `projectKey.project` |
 | 18 | **No username field** — PAT authentication is self-identifying. Auth header must be `Authorization: Bearer <token>`, never `Basic base64(user:token)` |
+| 20 | **Mandatory field labels must start with `"* "`** (asterisk + space) — `* Jira URL:`, `* Personal Access Token:`, `* Linked User Story:`, `* Execution Name:`, `* CSV Folder:`, `* CSV File:`, `* Config File:`. Optional fields (`Label:`) have no asterisk |
+| 21 | `tfExecutionName` is the **Test Execution title** (shown on Jira board). `tfLabel` is a separate optional **tag**. Never combine them into one field or construct the title from the label |
 | 19 | **Use Xray REST API to add tests to execution** — `POST /rest/raven/1.0/api/testexecution/{execKey}/test` with body `{"add":["TEST-KEY"]}`. Do NOT use the generic Jira issueLink API for this |
