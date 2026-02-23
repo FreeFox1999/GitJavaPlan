@@ -1,4 +1,4 @@
-# GitHub Copilot Prompt — Jira Test Case Importer (estjira) v7
+# GitHub Copilot Prompt — Jira Test Case Importer (estjira) v8
 # COMPLETE PROJECT — Generate All Files From Scratch
 
 > **Instructions for Copilot:** Generate the complete Maven Java 17 project described below,
@@ -1349,9 +1349,12 @@ java -jar target/jira-testcase-importer.jar
 | 30 | **`onBrowseConfigFile()` log** must include the resolved project key: `"Config loaded: N field mapping(s) — project: KEY"` |
 | 31 | **UI**: App has a dark **header banner** (color `#253858`) with title and subtitle labels |
 | 32 | **UI**: A **status bar** at the bottom shows operation feedback; a `JProgressBar` (indeterminate) appears when busy |
-| 33 | **UI**: Top panel uses `GridLayout(1,2)` — Jira Settings left, File Selection right (side by side) |
+| 33 | **UI**: All configuration fields are in a **single flat form panel** using `GridBagLayout` with 3 columns: label (col 0, right-aligned), field (col 1, `weightx=1`), button (col 2, fixed). No side-by-side sub-panels. |
 | 34 | **UI**: Log area is dark-themed (bg `#1E2228`, fg `#BED2BE`) with monospaced font, line wrap enabled |
 | 35 | **UI**: Preview table has alternating row colors, styled dark header, and preset column widths |
 | 36 | **UI**: Import button is green (`#00875A`), accent buttons are Jira blue (`#0052CC`), both white text |
 | 37 | **UI**: `TitledBorder` uses accent blue title color and `BOLD_FONT`; all borders have subtle compound styling |
 | 38 | **UI**: "Clear Log" button sits beside the Import button in the button row |
+| 39 | **UI**: `addFormRow(panel, row, label, field, btn)` helper adds rows to the form — label in col 0 (`EAST` anchor), field in col 1 (`weightx=1`, `fill=HORIZONTAL`), button in col 2 (`fill=NONE`). When `btn` is `null`, an invisible filler of width 110px is added to keep col 2 consistent |
+| 40 | **UI**: Section headings (`addSectionLabel`) span all 3 columns with small grey bold font. `addSeparator` inserts a `JSeparator` spanning all 3 columns between sections |
+| 41 | **UI**: `executionCardPanel` rows are `BorderLayout` panels with a fixed-width `JLabel` (160px) in `WEST` and the text field in `CENTER` — no nested `GridBagLayout` inside cards |
