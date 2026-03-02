@@ -6,11 +6,6 @@ REM Portable Runner (Run pre-built JAR)
 REM - Uses portable JDK from:    tools\jdk-17\
 REM - Uses portable Maven from:  tools\maven\
 REM - Runs existing JAR:         app\drafter-tool.jar
-REM - Clears injected envs, then sets local envs for THIS SESSION:
-REM       JAVA_HOME, MAVEN_HOME, PATH, MAVEN_OPTS
-REM - Sets MAVEN_OPTS trustStore to dynamic absolute path:
-REM       "<bundle_root>\certs\java.cacerts" (quoted to handle spaces)
-REM - No JAVA_TOOL_OPTIONS
 REM - Output: app\out\<Association>_<yyyyMMdd_HHmmss>.xlsx
 REM - Logs:   run.log (bundle root)
 REM ================================================================
@@ -30,7 +25,7 @@ set "MAVEN_HOME=%TOOLS_DIR%\maven"
 set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
 set "MVN_CMD=%MAVEN_HOME%\bin\mvn.cmd"
 
-REM ---- Fixed inputs (relative -> resolved dynamically) ----
+REM ---- Fixed inputs ----
 set "CERT_FILE=%CERTS_DIR%\java.cacerts"
 set "JAR=%APP_DIR%\drafter-tool.jar"
 
@@ -60,7 +55,6 @@ set "JAVA_TOOL_OPTIONS="
 set "_JAVA_OPTIONS="
 set "JDK_JAVA_OPTIONS="
 
-REM ---- Show env after clearing ----
 echo --- Env after clearing (this session) ---
 echo MAVEN_OPTS=%MAVEN_OPTS%
 echo MAVEN_ARGS=%MAVEN_ARGS%
@@ -79,10 +73,7 @@ REM 0c) Set local envs for THIS SESSION
 REM ================================================================
 set "PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%"
 
-REM [FIX 1] Quote the path in MAVEN_OPTS so spaces in the path don't
-REM         cause JVM to interpret the second token as the main class.
-REM         Inner quotes become part of the env var value, which Maven
-REM         passes correctly to the JVM as a single token.
+REM Build trustStore arg
 set "MAVEN_OPTS="
 set "TRUSTSTORE_ARG="
 if exist "%CERT_FILE%" (
@@ -95,7 +86,6 @@ if exist "%CERT_FILE%" (
   echo [WARN] Certificate file not found: "%CERT_FILE%" >> "%LOG%"
 )
 
-REM ---- Show local envs after setting ----
 echo.
 echo --- Local env set (this session) ---
 echo JAVA_HOME=%JAVA_HOME%
@@ -137,7 +127,7 @@ if not exist "%JAR%" (
 )
 
 REM ================================================================
-REM 2) Print versions (for supportability)
+REM 2) Print versions
 REM ================================================================
 echo.
 echo --- Java Version ---
@@ -189,29 +179,48 @@ if not defined TS (
 if not defined OUT set "OUT=out\%ASSOC%_%TS%.xlsx"
 if not exist "%APP_DIR%\out" mkdir "%APP_DIR%\out" >nul 2>&1
 
+REM ---- Full absolute output path ----
+set "OUT_FULL=%APP_DIR%\%OUT%"
+
 echo.
 echo Association : %ASSOC%
-echo Output file : %APP_DIR%\%OUT%
+echo Output file : %OUT_FULL%
 echo Params      : p1=%P1% p2=%P2% p3=%P3% p4=%P4% p5=%P5%
 echo.
 
 REM ================================================================
-REM 4) Run jar (live output + log)
-REM [FIX 2] MAVEN_OPTS does NOT affect java -jar, so we must pass
-REM         the trustStore flag explicitly via TRUSTSTORE_ARG.
-REM         The path is stored unquoted in TRUSTSTORE_ARG; PowerShell
-REM         receives it via an expandable here-string so spaces are safe.
+REM 4) Run jar
+REM
+REM [KEY FIX] Paths containing spaces must NOT be expanded by CMD
+REM inline inside the PowerShell -Command string — CMD expands %VAR%
+REM before PowerShell parses the string, splitting on every space.
+REM Solution: stage all space-prone paths as named env vars, then
+REM reference them inside PowerShell as $env:VARNAME.  PowerShell
+REM resolves $env: after full parse, so spaces are always safe.
 REM ================================================================
+set "PS_JAVA_EXE=%JAVA_EXE%"
+set "PS_JAR=%JAR%"
+set "PS_OUT=%OUT_FULL%"
+set "PS_LOG=%LOG%"
+
 echo ===== Running jar =====
-echo "%JAVA_EXE%" "%TRUSTSTORE_ARG%" -jar "%JAR%" --association "%ASSOC%" --p1 %P1% --p2 %P2% --p3 %P3% --p4 %P4% --p5 %P5% --out "%OUT%"
+echo java [trustStore] -jar "%JAR%" --association %ASSOC% --p1 %P1% --p2 %P2% --p3 %P3% --p4 %P4% --p5 %P5% --out "%OUT_FULL%"
 echo.
 
-REM Build the trustStore argument safely for PowerShell (handle spaces in path)
-set "PS_TRUST="
-if defined TRUSTSTORE_ARG set "PS_TRUST=%TRUSTSTORE_ARG%"
-
 powershell -NoProfile -Command ^
-  "& { $javaArgs = @(); if ($env:PS_TRUST) { $javaArgs += $env:PS_TRUST }; $javaArgs += '-jar', '%JAR%', '--association', '%ASSOC%', '--p1', '%P1%', '--p2', '%P2%', '--p3', '%P3%', '--p4', '%P4%', '--p5', '%P5%', '--out', '%OUT%'; & '%JAVA_EXE%' @javaArgs 2>&1 | Tee-Object -FilePath '%LOG%' -Append; exit $LASTEXITCODE }"
+  "& {" ^
+  "  $jArgs = [System.Collections.Generic.List[string]]::new();" ^
+  "  if ($env:TRUSTSTORE_ARG) { $jArgs.Add($env:TRUSTSTORE_ARG) };" ^
+  "  $jArgs.AddRange([string[]]@(" ^
+  "    '-jar', $env:PS_JAR," ^
+  "    '--association', '%ASSOC%'," ^
+  "    '--p1', '%P1%', '--p2', '%P2%', '--p3', '%P3%'," ^
+  "    '--p4', '%P4%', '--p5', '%P5%'," ^
+  "    '--out', $env:PS_OUT" ^
+  "  ));" ^
+  "  & $env:PS_JAVA_EXE @jArgs 2>&1 | Tee-Object -FilePath $env:PS_LOG -Append;" ^
+  "  exit $LASTEXITCODE" ^
+  "}"
 
 if errorlevel 1 (
   echo [ERROR] Application failed. Last 60 lines:
@@ -221,7 +230,7 @@ if errorlevel 1 (
 
 echo.
 echo All done successfully!
-echo Output file: "%APP_DIR%\%OUT%"
+echo Output file: "%OUT_FULL%"
 echo Log file   : "%LOG%"
 echo.
 pause
@@ -238,7 +247,7 @@ exit /b 1
 
 :tailLog
 set "N=%~1"
-powershell -NoProfile -Command "if (Test-Path '%LOG%') { Get-Content -Path '%LOG%' -Tail %N% }" 2>nul
+powershell -NoProfile -Command "if (Test-Path $env:PS_LOG) { Get-Content -Path $env:PS_LOG -Tail %N% }" 2>nul
 if errorlevel 1 (
   if exist "%LOG%" type "%LOG%"
 )
