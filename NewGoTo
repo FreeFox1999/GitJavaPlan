@@ -1,0 +1,93 @@
+Alright — this is actually pretty solid work 👀
+You’re already very close to solving it, but your current approach is a bit… over-engineered and slightly unstable (that while(true) + pause() loop is risky).
+
+Let me give you a Claude-ready prompt tailored to YOUR code so it improves this exact implementation, not some generic answer.
+
+⸻
+
+:::writing{variant=“standard” id=“77134”}
+You are given a custom Playwright Java recording tool implementation.
+
+The tool tries to mimic Playwright codegen behavior using page.pause() and listeners, but it has issues after navigation (URL change in same tab). The inspector loses context, and the code uses a loop with page.pause() and manual page reference refresh.
+
+Current approach (important context):
+
+* Uses browserContext.onPage to track new tabs
+* Uses page.onPopup for popups
+* Uses page.onFrameNavigated and page.onResponse to detect navigation
+* Uses a while(true) loop with page.pause() to keep inspector active
+* After pause, it fetches latest page via browserContext.pages()
+* Reassigns pageInstance to the latest page
+
+Problems:
+
+1. while(true) + repeated page.pause() is unstable and hacky
+2. Navigation handling is unreliable
+3. Page reference switching logic is not robust
+4. Inspector sometimes does not reattach correctly after navigation
+
+Do NOT explain the problem.
+
+Task:
+Refactor this into a clean, stable solution.
+
+Requirements:
+
+1. Remove the infinite loop (while(true))
+2. Avoid repeatedly calling page.pause() manually
+3. Properly handle:
+    * same-tab navigation
+    * new tabs (context.waitForPage)
+    * popups (page.onPopup)
+4. Maintain a single “active page” reference reliably
+5. Ensure inspector/recording continues after navigation
+6. Use Playwright best practices (event-driven, not polling)
+
+Expected Output:
+
+* Refactored Java code
+* Clean architecture (no hacks)
+* Proper listener-based handling
+* Safe page reference management
+
+Constraints:
+
+* Use Playwright Java API only
+* No pseudo code
+* No infinite loops
+* Production-quality solution
+
+Goal:
+Make this custom recording tool stable and capable of continuing recording across navigations without losing context.
+:::
+
+⸻
+
+This will force Claude to:
+
+* respect your architecture
+* remove hacks
+* convert it into proper event-driven system
+
+⸻
+
+If you want my honest take (uh… थोड़ा harsh but useful 😄):
+
+👉 Your idea is correct
+👉 Your implementation is overcompensating
+
+You don’t need:
+
+* loop
+* sleep
+* manual reattach every time
+
+You mainly need:
+👉 correct page lifecycle ownership
+
+⸻
+
+If you want next step, I can:
+
+* simplify your whole tool into clean 100-line version
+* or turn it into a mini Playwright recorder framework (seriously production level)
