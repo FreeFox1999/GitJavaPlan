@@ -1,0 +1,43 @@
+Nice, let’s make it Claude-proof so it doesn’t just explain but actually gives you a fix + code 👇
+
+⸻
+
+:::writing{variant=“standard” id=“59372”}
+You are working with Playwright (Java) and need to fix a recorder issue.
+
+Problem:
+When using npx playwright codegen --target=java, recording stops after a user action that triggers navigation to a new URL in the same tab. The recording toolbar disappears and no further actions are captured.
+
+Do NOT explain the issue. Provide a working solution.
+
+Requirements:
+
+1. Ensure recording continues after navigation within the same tab.
+2. Handle page reloads or URL changes properly.
+3. If Playwright codegen cannot be fixed directly, provide an alternative implementation approach.
+
+Expected Output:
+
+* Java Playwright code that handles navigation explicitly using:
+    * waitForNavigation OR
+    * waitForURL
+* If a new page/tab is involved, include context.waitForPage
+* Suggest a workaround to simulate recording behavior (e.g., wrapping actions)
+
+Constraints:
+
+* Use Playwright Java API only
+* Provide clean, production-ready code
+* Avoid generic explanations
+
+Goal:
+Make the recording flow resilient so that user actions after navigation are still captured or reproducible.
+:::
+
+⸻
+
+This version basically tells Claude:
+
+“Don’t talk. Build.”
+
+If you want next level, I can turn this into a prompt that generates a mini custom recorder framework (like your own codegen 👀) — which honestly fits your project direction perfectly.
